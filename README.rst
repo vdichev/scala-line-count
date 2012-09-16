@@ -14,17 +14,3 @@ Run it like so::
 
 	awk -f lc.awk $(find /project/dir -name "*.scala")
 
-Known issues
-------------
-
-* block comments after line comments are not ignored as they should be::
-
-    code // /*
-    code // */
-* code between a closing block quote and an opening block quote is ignored::
-
-    */ code /*
-* multiple opening/closing block comments are only acknowledged as one::
-
-    /* /* ...
-    */ */

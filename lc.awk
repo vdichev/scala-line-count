@@ -6,7 +6,6 @@
 #
 # Assumptions/limitations:
 #  - Does not include blank lines in the average
-#  - Assumes no code on a line after a "*/" - poss change this?
 #  - Counts *any* non-comment line as code eg { or } by themselves, etc
 #  - depends on hash order of awk - this is risky! (See END code)
 #  - Presently, the output redirects quite badly - command line option?
@@ -35,7 +34,12 @@ FNR == 1 {
 # Increment line count as first thing done
 {
 	raw_linecount[FILENAME]++
-	START_CODE=0
+	CODE_LINE=!in_comment
+	COMMENT_LINE=in_comment
+	start = -1
+	if($1 ~ /^\/\*/) {
+		CODE_LINE=0
+	}
 }
 
 # Test for "//" in the first record
@@ -46,38 +50,44 @@ FNR == 1 {
 	}
 }
 
-# Test for "//" in rest of the record (comment after code - counts as both)
-/\/\// {
-	if (!in_comment) {
-		comments[FILENAME]++	# lines count will be incremented below
-	}
-}
+################################################################################
+{
+	s = $0
 
-# This wierd "/\/\*/" junk is awk-ish for the string "/*" - aka comment begin
-/\/\*/ {			# Begin multi-line comment
-	if($1 !~ /^\/\*/ && (!in_comment)) {	# "/*" type comment AFTER code - is both
-		START_CODE=1
-		lines[FILENAME]++
+	while (match(s = substr(s, start + 2), /\/\/|\/\*|\*\//) ) {
+		start = RSTART
+		comment = substr(s, start, 2)
+		before = substr(s, 1, start - 1)
+		if (!in_comment && (comment == "//" || comment == "/*")) {
+			if (!match(before, /^[ \t]*$/)) {
+				CODE_LINE = 1
+			}
+			COMMENT_LINE=1
+			if (comment == "//") {
+				break
+			}
+		}
+	
+		if (comment == "/*") {
+			in_comment++
+		}
+	
+		if (comment == "*/") {
+			after = substr(s, start + 2)
+			if (!match(after, /\/\/|\/\*|^[ \t]*$/) && in_comment == 1) {
+				CODE_LINE=1
+			}
+			in_comment--
+		}
 	}
-	in_comment ++
 }
-
-# And this is "*/" aka comment end
-/\*\// {			# End of multi-line comment
-	if(in_comment){	# Multi line comment - can increment
-		comments[FILENAME]++
-		if (DEBUG) print $0
-		in_comment--	# Reset Boolean
-		if ($NF ~ /\*\/$/ || START_CODE)
-			next
-	}
-}
+################################################################################
 
 # Test for empty lines and skip
 /^[ \t]*$/ {next}
 
-in_comment {comments[FILENAME]++}
-!in_comment {lines[FILENAME]++; if (DEBUG) print $0 }
+COMMENT_LINE {comments[FILENAME]++}
+CODE_LINE {lines[FILENAME]++}
 
 #----------------------------------------------------------------------------
 # Termination code
