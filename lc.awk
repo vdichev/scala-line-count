@@ -38,7 +38,7 @@ FNR == 1 {
 	COMMENT_LINE=in_comment
 	start = 1
 	len = 0
-	if($1 ~ /^\/\*/) {
+	if($1 ~ /^\/\*|^\/\//) {
 		CODE_LINE=0
 	}
 }
