@@ -36,17 +36,10 @@ FNR == 1 {
 	raw_linecount[FILENAME]++
 	CODE_LINE=!in_comment
 	COMMENT_LINE=in_comment
-	start = -1
+	start = 1
+	len = 0
 	if($1 ~ /^\/\*/) {
 		CODE_LINE=0
-	}
-}
-
-# Test for "//" in the first record
-($1 ~ /^\/\//) {		   # single line comment - skip to next rec
-	if (!in_comment) {
-		comments[FILENAME]++
-		next
 	}
 }
 
@@ -54,26 +47,45 @@ FNR == 1 {
 {
 	s = $0
 
-	while (match(s = substr(s, start + 2), /\/\/|\/\*|\*\//) ) {
+	while (match(s = substr(s, start + len), /\/\/|\/\*|\*\/|'"'|"[^"]|"""/) ) {
 		start = RSTART
-		comment = substr(s, start, 2)
+		len = RLENGTH
+		token = substr(s, start, len)
 		before = substr(s, 1, start - 1)
-		if (!in_comment && (comment == "//" || comment == "/*")) {
+		# compensate for lack of zero-width negative lookahead
+		if (index(token, "\"") == 1 && len == 2) {
+			token = "\""
+			len = 1
+		}
+		if (!in_comment && token == "\"\"\"") {
+			in_string = !in_string
+			if (!in_string) {
+				match(s, /"""["]*/)
+				len = RLENGTH
+			}
+			continue
+		}
+		after = substr(s, start + len)
+		if (in_string) continue
+		if (!in_comment && token == "\"") {
+			s = before substr(after, match(after, /[^\]"([^"]|$)/) + 1)
+			continue
+		}
+		if (!in_comment && (token == "//" || token == "/*")) {
 			if (!match(before, /^[ \t]*$/)) {
 				CODE_LINE = 1
 			}
 			COMMENT_LINE=1
-			if (comment == "//") {
+			if (token == "//") {
 				break
 			}
 		}
 	
-		if (comment == "/*") {
+		if (token == "/*") {
 			in_comment++
 		}
 	
-		if (comment == "*/") {
-			after = substr(s, start + 2)
+		if (token == "*/") {
 			if (!match(after, /\/\/|\/\*|^[ \t]*$/) && in_comment == 1) {
 				CODE_LINE=1
 			}
