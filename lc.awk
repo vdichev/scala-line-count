@@ -68,7 +68,7 @@ FNR == 1 {
 		after = substr(s, start + len)
 		if (in_string) continue
 		if (!in_comment && token == "\"") {
-			s = before substr(after, match(after, /[^\]"([^"]|$)/) + 1)
+			s = before substr(after, match(after, /[^\\]"([^"]|$)/) + 1)
 			continue
 		}
 		if (!in_comment && (token == "//" || token == "/*")) {
